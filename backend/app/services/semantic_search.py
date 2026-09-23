@@ -2,6 +2,7 @@ import os
 import math
 import numpy as np
 import pandas as pd
+import faiss
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 from app.services.data_store import movies_master_df
@@ -11,34 +12,62 @@ PROCESSED_DATA_DIR = os.path.join(BASE_DIR, '..', 'data', 'processed')
 
 EMBEDDINGS_PATH = os.path.join(PROCESSED_DATA_DIR, 'movie_embeddings_finetuned.npy')
 INDEX_PATH = os.path.join(PROCESSED_DATA_DIR, 'movie_embedding_index_finetuned.csv')
+FAISS_PATH = os.path.join(PROCESSED_DATA_DIR, 'movie_embeddings_finetuned.faiss')
 
 # Global variables to cache the model and embeddings
 semantic_model = None
 movie_embeddings = None
 embedding_index = None
+faiss_index = None
 
 def init_semantic_search():
-    """Loads the model and embeddings into memory if they exist."""
-    global semantic_model, movie_embeddings, embedding_index
+    """Loads the model, embeddings, and FAISS index into memory if they exist."""
+    global semantic_model, movie_embeddings, embedding_index, faiss_index
     
     if semantic_model is not None:
         return # Already initialized
         
     print("Initializing Semantic Search engine...")
-    if os.path.exists(EMBEDDINGS_PATH) and os.path.exists(INDEX_PATH):
+    if os.path.exists(EMBEDDINGS_PATH) and os.path.exists(INDEX_PATH) and os.path.exists(FAISS_PATH):
         # 1. Load the model
         print("Loading fine-tuned sentence-transformer model...")
         model_dir = os.path.join(BASE_DIR, '..', 'models', 'movie_plot_minilm_finetuned')
         semantic_model = SentenceTransformer(model_dir)
         
         # 2. Load the embeddings and index
-        print("Loading pre-computed embeddings...")
+        print("Loading pre-computed embeddings and FAISS index...")
         movie_embeddings = np.load(EMBEDDINGS_PATH)
         embedding_index = pd.read_csv(INDEX_PATH)
+        faiss_index = faiss.read_index(FAISS_PATH)
         
-        print(f"Semantic search initialized with {len(movie_embeddings)} movies.")
+        print(f"Semantic search initialized with {faiss_index.ntotal} movies in FAISS.")
     else:
-        print("Warning: Embedding files not found. Semantic search is disabled until built.")
+        print("Warning: Embedding or FAISS files not found. Semantic search is disabled until built.")
+
+def search_faiss(query_vector, top_k=500):
+    """Reusable FAISS search function."""
+    global faiss_index
+    if faiss_index is None:
+        return []
+    
+    # Ensure vector is float32 and shape (1, dim)
+    q = np.array(query_vector, dtype=np.float32)
+    if len(q.shape) == 1:
+        q = q.reshape(1, -1)
+        
+    faiss.normalize_L2(q)
+    
+    k = min(top_k, faiss_index.ntotal)
+    distances, indices = faiss_index.search(q, k)
+    
+    results = []
+    for i in range(k):
+        idx = int(indices[0][i])
+        score = float(distances[0][i])
+        if idx != -1:
+            results.append((idx, score))
+            
+    return results
 
 def search_plot_semantic(query: str, limit: int = 10):
     global semantic_model, movie_embeddings, embedding_index
@@ -59,16 +88,11 @@ def search_plot_semantic(query: str, limit: int = 10):
     # encode() returns a numpy array, we reshape to (1, -1) for sklearn
     query_vector = semantic_model.encode([query])
     
-    # 2. Calculate Cosine Similarity against all 44k movie embeddings
-    # similarity_scores will have shape (1, N). Flatten it to 1D array.
-    similarity_scores = cosine_similarity(query_vector, movie_embeddings).flatten()
+    # 2. FAISS Nearest Neighbor Search
+    scores_with_indices = search_faiss(query_vector, top_k=limit * 10)
     
-    # 3. Get top matches
-    # Filter out weak/negative matches (e.g. score <= 0.1)
-    scores_with_indices = [(idx, score) for idx, score in enumerate(similarity_scores) if score > 0.1]
-    
-    # Sort descending
-    sorted_scores = sorted(scores_with_indices, key=lambda x: x[1], reverse=True)[:limit]
+    # 3. Get top matches (filter weak matches and take limit)
+    scores_with_indices = [x for x in scores_with_indices if x[1] > 0.1][:limit]
     
     # 4. Map back to master dataset
     results = []
@@ -78,7 +102,7 @@ def search_plot_semantic(query: str, limit: int = 10):
     # A faster way:
     master_df_indexed = movies_master_df.set_index('tmdbId')
     
-    for idx, score in sorted_scores:
+    for idx, score in scores_with_indices:
         tmdb_id = embedding_index.iloc[idx]['tmdbId']
         
         if tmdb_id in master_df_indexed.index:
@@ -116,12 +140,12 @@ def search_similar_by_tmdb_id(tmdb_id: int, min_year: int = None, max_year: int 
     source_idx = matching_indices[0]
     source_vector = movie_embeddings[source_idx].reshape(1, -1)
     
-    # Calculate similarity against all movies
-    similarity_scores = cosine_similarity(source_vector, movie_embeddings).flatten()
+    # 2. FAISS Nearest Neighbor Search
+    # Fetch extra candidates since we'll filter out the source movie and by year
+    scores_with_indices = search_faiss(source_vector, top_k=limit * 10 + 50)
     
-    # Filter and sort
-    scores_with_indices = [(idx, score) for idx, score in enumerate(similarity_scores) if score > 0.1]
-    sorted_scores = sorted(scores_with_indices, key=lambda x: x[1], reverse=True)
+    # Filter weak matches
+    sorted_scores = [x for x in scores_with_indices if x[1] > 0.1]
     
     master_df_indexed = movies_master_df.set_index('tmdbId')
     

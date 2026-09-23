@@ -67,24 +67,25 @@ def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: st
     
     if plot and plot.strip():
         query_vector = semantic_search.semantic_model.encode([plot.strip()])
-        similarity_scores = cosine_similarity(query_vector, semantic_search.movie_embeddings).flatten()
         
         if constrained_by_person:
+            # We want to use FAISS to get candidates. To ensure we don't miss any movies
+            # matching the specific actor/director, we fetch all scores. FAISS is extremely fast.
+            scores_with_indices = semantic_search.search_faiss(query_vector, top_k=45430)
+            
             # Evaluate ONLY movies matching the person(s)
-            for tmdb_id in seed_ids:
-                idx_series = semantic_search.embedding_index.index[semantic_search.embedding_index['tmdbId'] == tmdb_id].tolist()
-                if idx_series:
-                    idx = idx_series[0]
-                    score = float(similarity_scores[idx])
-                    candidates[tmdb_id] = score
-        else:
-            # Plot only, no person constraints. Take top 500 semantic matches.
-            scores_with_indices = [(idx, float(score)) for idx, score in enumerate(similarity_scores) if score > 0.0]
-            scores_with_indices.sort(key=lambda x: x[1], reverse=True)
-            scores_with_indices = scores_with_indices[:500]
             for idx, score in scores_with_indices:
                 tmdb_id = semantic_search.embedding_index.iloc[idx]['tmdbId']
-                candidates[tmdb_id] = score
+                if tmdb_id in seed_ids:
+                    candidates[tmdb_id] = float(score)
+        else:
+            # Plot only, no person constraints. Take top 500 semantic matches.
+            scores_with_indices = semantic_search.search_faiss(query_vector, top_k=500)
+            
+            for idx, score in scores_with_indices:
+                if score > 0.0:
+                    tmdb_id = semantic_search.embedding_index.iloc[idx]['tmdbId']
+                    candidates[tmdb_id] = float(score)
     else:
         # No plot provided.
         if constrained_by_person:
