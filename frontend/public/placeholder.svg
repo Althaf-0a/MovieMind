@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="500" height="750" viewBox="0 0 500 750" fill="none">
+  <rect width="500" height="750" fill="#1a1a24"/>
+  <rect x="25" y="25" width="450" height="700" stroke="#333344" stroke-width="2" stroke-dasharray="10 10" fill="none"/>
+  
+  <g opacity="0.4">
+    <!-- Clapperboard Icon -->
+    <path d="M150 300 H350 V450 H150 Z" fill="#2a2a35" stroke="#444455" stroke-width="4"/>
+    <path d="M150 300 L200 250 H400 L350 300 Z" fill="#3a3a45" stroke="#444455" stroke-width="4"/>
+    <path d="M165 285 L180 265 M215 285 L230 265 M265 285 L280 265 M315 285 L330 265 M365 285 L380 265" stroke="#444455" stroke-width="4"/>
+    <circle cx="250" cy="375" r="25" fill="#444455"/>
+    <path d="M242 363 L265 375 L242 387 Z" fill="#1a1a24"/>
+  </g>
+
+  <text x="250" y="520" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#666677" text-anchor="middle" letter-spacing="2">NO POSTER</text>
+  <text x="250" y="550" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#444455" text-anchor="middle">AVAILABLE</text>
+</svg>

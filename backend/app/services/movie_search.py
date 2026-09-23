@@ -16,7 +16,7 @@ def format_movie_result(row):
         "poster_path": row['poster_path'] if isinstance(row['poster_path'], str) else None
     }
 
-def search_movies_by_title(query: str, limit: int = 50):
+def search_movies_by_title(query: str, min_year: int = None, max_year: int = None, limit: int = 50):
     query = query.strip()
     if not query:
         return []
@@ -27,25 +27,22 @@ def search_movies_by_title(query: str, limit: int = 50):
     if not res["matched"] or not res["resolved"]:
         return []
         
-    # Find all movies matching the resolved title (there could be remakes with the same title)
+    # Find the top matching movie to use as the semantic source
     resolved = res["resolved"].lower().strip()
     matches = movies_master_df[movies_master_df['title'].str.lower().str.strip() == resolved]
     
     if matches.empty:
-        # Fallback to original_title just in case
         matches = movies_master_df[movies_master_df['original_title'].str.lower().str.strip() == resolved]
         
     if matches.empty:
         return []
-        
-    # Sort by popularity to get the most relevant one first
-    sorted_matches = matches.sort_values(by='popularity', ascending=False).head(limit)
+
+    # Get the most popular exact match as our source
+    best_match = matches.sort_values(by='popularity', ascending=False).iloc[0]
+    source_tmdb_id = int(best_match['tmdbId'])
     
-    results = []
-    for _, row in sorted_matches.iterrows():
-        movie_data = format_movie_result(row)
-        movie_data['match_score'] = res["score"]
-        movie_data['resolved_title'] = res["resolved"]
-        results.append(movie_data)
-        
+    # Perform semantic similar-movie search based on this movie's embedding
+    from app.services.semantic_search import search_similar_by_tmdb_id
+    results = search_similar_by_tmdb_id(source_tmdb_id, min_year, max_year, limit)
+    
     return results

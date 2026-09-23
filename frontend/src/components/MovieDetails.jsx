@@ -87,6 +87,15 @@ const MovieDetails = ({ movie, onBack }) => {
   const director = details.director_text || details.director || "Unknown";
   const cast = details.cast_text || details.cast || "Unknown";
 
+  const fallbackImage = '/placeholder.svg';
+  
+  const handleImageError = (e) => {
+    if (e.target.src !== window.location.origin + fallbackImage) {
+      e.target.onerror = null;
+      e.target.src = fallbackImage;
+    }
+  };
+
   return (
     <div className="movie-details-view">
       <button className="btn-back" onClick={onBack}>&larr; Back to Results</button>
@@ -94,9 +103,9 @@ const MovieDetails = ({ movie, onBack }) => {
       <div className="details-header">
         <div className="details-poster">
           {posterUrl ? (
-            <img src={posterUrl} alt={title} />
+            <img src={posterUrl} alt={title} onError={handleImageError} />
           ) : (
-            <div className="no-poster">No Poster</div>
+            <img src={fallbackImage} alt="No Poster Available" />
           )}
         </div>
         

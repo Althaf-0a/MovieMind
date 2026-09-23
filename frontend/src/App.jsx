@@ -23,7 +23,8 @@ function App() {
   const [actor, setActor] = useState('')
   const [director, setDirector] = useState('')
   const [genre, setGenre] = useState('')
-  const [year, setYear] = useState('')
+  const [minYear, setMinYear] = useState('')
+  const [maxYear, setMaxYear] = useState('')
   const [minRating, setMinRating] = useState('')
   const [limit, setLimit] = useState(10)
   
@@ -47,6 +48,15 @@ function App() {
     e.preventDefault()
     if (!query.trim() && currentMode !== MODES.STORY && !actor.trim() && !director.trim()) return
 
+    const parsedMinYear = minYear ? parseInt(minYear) : null
+    const parsedMaxYear = maxYear ? parseInt(maxYear) : null
+
+    if (parsedMinYear !== null && parsedMaxYear !== null && parsedMinYear > parsedMaxYear) {
+      setError("Validation Error: 'From Year' cannot be greater than 'To Year'.")
+      setResults([])
+      return
+    }
+
     setIsLoading(true)
     setError(null)
     setResults([])
@@ -61,33 +71,41 @@ function App() {
           actor: actor,
           director: director,
           genre: genre,
-          year: year ? parseInt(year) : null,
+          min_year: parsedMinYear,
+          max_year: parsedMaxYear,
           min_rating: minRating ? parseFloat(minRating) : null,
           top_n: limit
         })
         data = (response.results || []).map(m => ({ ...m, _source: 'MovieMind Database' }))
       } else if (currentMode === MODES.TITLE) {
-        // Fallback logic
-        const localSearch = await searchMovies(query, 1)
-        if (localSearch && localSearch.length > 0) {
-          const relatedData = await getRelatedMovies(localSearch[0].tmdbId)
-          if (relatedData && relatedData.source_movie) {
-            data = [{ ...relatedData.source_movie, _source: 'MovieMind Database', _is_main: true }]
-          }
-        } else {
+        const localSearch = await searchMovies(query, parsedMinYear, parsedMaxYear, limit)
+        data = (localSearch || []).map(m => ({ ...m, _source: 'MovieMind Database' }))
+        
+        // If no local, fallback to TMDB (TMDB doesn't easily support min/max year on basic search, so we just pass query)
+        if (data.length === 0) {
           const tmdbSearch = await searchTMDBMovies(query, 1)
-          if (tmdbSearch && tmdbSearch.results && tmdbSearch.results.length > 0) {
-            const relatedData = await getRelatedMovies(tmdbSearch.results[0].id)
-            if (relatedData && relatedData.source_movie) {
-              data = [{ ...relatedData.source_movie, _source: 'TMDB', _is_main: true }]
-            }
+          if (tmdbSearch && tmdbSearch.results) {
+             let tmdbResults = tmdbSearch.results;
+             // Apply year filter manually to TMDB results if provided
+             if (parsedMinYear !== null) {
+                 tmdbResults = tmdbResults.filter(m => m.release_date && parseInt(m.release_date.split('-')[0]) >= parsedMinYear);
+             }
+             if (parsedMaxYear !== null) {
+                 tmdbResults = tmdbResults.filter(m => m.release_date && parseInt(m.release_date.split('-')[0]) <= parsedMaxYear);
+             }
+             
+             data = tmdbResults.slice(0, limit).map(m => ({
+                 ...m,
+                 tmdbId: m.id,
+                 _source: 'TMDB'
+             }))
           }
         }
       } else if (currentMode === MODES.ACTOR) {
-        const res = await searchPeople(query, 'actor', limit)
+        const res = await searchPeople(query, 'actor', parsedMinYear, parsedMaxYear, limit)
         data = (res || []).map(m => ({ ...m, _source: 'MovieMind Database' }))
       } else if (currentMode === MODES.DIRECTOR) {
-        const res = await searchPeople(query, 'director', limit)
+        const res = await searchPeople(query, 'director', parsedMinYear, parsedMaxYear, limit)
         data = (res || []).map(m => ({ ...m, _source: 'MovieMind Database' }))
       }
       
@@ -158,54 +176,64 @@ function App() {
             )}
           </div>
 
-          {currentMode === MODES.STORY && (
-            <div className="advanced-filters-section">
-              <button 
-                type="button" 
-                className="toggle-advanced-btn"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-              >
-                {showAdvanced ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
-              </button>
-              
-              {showAdvanced && (
-                <div className="filters-grid">
-                  <div className="filter-group">
-                    <label>Actor</label>
-                    <input type="text" value={actor} onChange={(e) => setActor(e.target.value)} placeholder="e.g. Jake Gyllenhaal" />
+          <div className="advanced-filters-section">
+            <button 
+              type="button" 
+              className="toggle-advanced-btn"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+            >
+              {showAdvanced ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+            </button>
+            
+            {showAdvanced && (
+              <div className="filters-grid">
+                {currentMode === MODES.STORY && (
+                  <>
+                    <div className="filter-group">
+                      <label>Actor</label>
+                      <input type="text" value={actor} onChange={(e) => setActor(e.target.value)} placeholder="e.g. Jake Gyllenhaal" />
+                    </div>
+                    <div className="filter-group">
+                      <label>Director</label>
+                      <input type="text" value={director} onChange={(e) => setDirector(e.target.value)} placeholder="e.g. Christopher Nolan" />
+                    </div>
+                    <div className="filter-group">
+                      <label>Genre</label>
+                      <select value={genre} onChange={(e) => setGenre(e.target.value)}>
+                        <option value="">Any genre</option>
+                        <option value="Action">Action</option>
+                        <option value="Adventure">Adventure</option>
+                        <option value="Animation">Animation</option>
+                        <option value="Comedy">Comedy</option>
+                        <option value="Crime">Crime</option>
+                        <option value="Documentary">Documentary</option>
+                        <option value="Drama">Drama</option>
+                        <option value="Family">Family</option>
+                        <option value="Fantasy">Fantasy</option>
+                        <option value="History">History</option>
+                        <option value="Horror">Horror</option>
+                        <option value="Music">Music</option>
+                        <option value="Mystery">Mystery</option>
+                        <option value="Romance">Romance</option>
+                        <option value="Science Fiction">Science Fiction</option>
+                        <option value="Thriller">Thriller</option>
+                        <option value="War">War</option>
+                        <option value="Western">Western</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                
+                <div className="filter-group" style={{ gridColumn: 'span 2' }}>
+                  <label>Release Year Range</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input type="number" min="1900" max="2030" value={minYear} onChange={(e) => setMinYear(e.target.value)} placeholder="From Year" style={{ flex: 1 }} />
+                    <span style={{ display: 'flex', alignItems: 'center', color: 'var(--text-secondary)' }}>—</span>
+                    <input type="number" min="1900" max="2030" value={maxYear} onChange={(e) => setMaxYear(e.target.value)} placeholder="To Year" style={{ flex: 1 }} />
                   </div>
-                  <div className="filter-group">
-                    <label>Director</label>
-                    <input type="text" value={director} onChange={(e) => setDirector(e.target.value)} placeholder="e.g. Christopher Nolan" />
-                  </div>
-                  <div className="filter-group">
-                    <label>Genre</label>
-                    <select value={genre} onChange={(e) => setGenre(e.target.value)}>
-                      <option value="">Any genre</option>
-                      <option value="Action">Action</option>
-                      <option value="Adventure">Adventure</option>
-                      <option value="Animation">Animation</option>
-                      <option value="Comedy">Comedy</option>
-                      <option value="Crime">Crime</option>
-                      <option value="Documentary">Documentary</option>
-                      <option value="Drama">Drama</option>
-                      <option value="Family">Family</option>
-                      <option value="Fantasy">Fantasy</option>
-                      <option value="History">History</option>
-                      <option value="Horror">Horror</option>
-                      <option value="Music">Music</option>
-                      <option value="Mystery">Mystery</option>
-                      <option value="Romance">Romance</option>
-                      <option value="Science Fiction">Science Fiction</option>
-                      <option value="Thriller">Thriller</option>
-                      <option value="War">War</option>
-                      <option value="Western">Western</option>
-                    </select>
-                  </div>
-                  <div className="filter-group">
-                    <label>Release Year</label>
-                    <input type="number" min="1900" max="2030" value={year} onChange={(e) => setYear(e.target.value)} placeholder="Any year" />
-                  </div>
+                </div>
+
+                {currentMode === MODES.STORY && (
                   <div className="filter-group">
                     <label>Min Rating</label>
                     <select value={minRating} onChange={(e) => setMinRating(e.target.value)}>
@@ -217,10 +245,10 @@ function App() {
                       <option value="9">9+ / 10</option>
                     </select>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
 
           <div className="search-footer">
             <div className="filter-group limit-group">

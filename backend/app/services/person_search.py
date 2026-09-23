@@ -35,7 +35,7 @@ if 'normalized_director_name' not in movie_directors_df.columns:
     movie_directors_df['normalized_director_name'] = movie_directors_df['director_name'].apply(normalize_name)
 
 
-def search_people(query: str, role: str = 'all', limit: int = 50):
+def search_people(query: str, role: str = 'all', min_year: int = None, max_year: int = None, limit: int = 50):
     query = query.strip()
     if not query:
         return []
@@ -66,6 +66,14 @@ def search_people(query: str, role: str = 'all', limit: int = 50):
     # Filter master dataset
     movies_mask = movies_master_df['tmdbId'].isin(matched_tmdb_ids)
     matches = movies_master_df[movies_mask].copy()
+
+    if min_year is not None:
+        matches = matches[matches['release_year'] >= min_year]
+    if max_year is not None:
+        matches = matches[matches['release_year'] <= max_year]
+        
+    if matches.empty:
+        return []
     
     # Sort the results by popularity so the most famous movies with that person show first
     matches = matches.sort_values(by='popularity', ascending=False).head(limit)
