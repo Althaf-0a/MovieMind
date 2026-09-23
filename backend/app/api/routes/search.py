@@ -10,20 +10,24 @@ router = APIRouter()
 @router.get("/movies")
 def search_movies_endpoint(
     query: str = Query(..., min_length=1, description="Movie title to search for"),
+    min_year: Optional[int] = Query(None),
+    max_year: Optional[int] = Query(None),
     limit: int = Query(10, ge=1, le=50, description="Max number of results to return")
 ):
     """Search for movies by their title using fuzzy matching."""
-    results = search_movies_by_title(query, limit)
+    results = search_movies_by_title(query, min_year, max_year, limit)
     return results
 
 @router.get("/people")
 def search_people_endpoint(
     query: str = Query(..., min_length=1, description="Name of the person (actor or director)"),
     role: str = Query("all", pattern="^(actor|director|all)$", description="Role to search for: actor, director, or all"),
+    min_year: Optional[int] = Query(None),
+    max_year: Optional[int] = Query(None),
     limit: int = Query(10, ge=1, le=50, description="Max number of results to return")
 ):
     """Search for movies starring or directed by a specific person."""
-    results = search_people(query, role, limit)
+    results = search_people(query, role, min_year, max_year, limit)
     return results
 
 from app.services.semantic_search import search_plot_semantic

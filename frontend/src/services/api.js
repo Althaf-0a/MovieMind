@@ -19,10 +19,12 @@ export const getRecommendations = async (movieTitle, topN = 10) => {
 /**
  * Searches for a movie by its title.
  */
-export const searchMovies = async (query, limit = 50) => {
+export const searchMovies = async (query, minYear = null, maxYear = null, limit = 50) => {
   const response = await axios.get(`${API_BASE_URL}/search/movies`, {
     params: {
       query: query,
+      min_year: minYear,
+      max_year: maxYear,
       limit: limit
     }
   });
@@ -85,11 +87,13 @@ export const searchHybridDiscovery = async (params) => {
 /**
  * Searches for movies by actor or director name.
  */
-export const searchPeople = async (query, role = 'all', limit = 50) => {
+export const searchPeople = async (query, role = 'all', minYear = null, maxYear = null, limit = 50) => {
   const response = await axios.get(`${API_BASE_URL}/search/people`, {
     params: {
       query: query,
       role: role,
+      min_year: minYear,
+      max_year: maxYear,
       limit: limit
     }
   });

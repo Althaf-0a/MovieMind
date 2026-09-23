@@ -25,6 +25,15 @@ const MovieCard = ({ movie, isPlotSearch, onClick }) => {
   const overview = movie.overview_text || movie.overview;
   const showOverview = isPlotSearch || movie._source === 'TMDB';
 
+  const fallbackImage = '/placeholder.svg';
+
+  const handleImageError = (e) => {
+    if (e.target.src !== window.location.origin + fallbackImage) {
+      e.target.onerror = null;
+      e.target.src = fallbackImage;
+    }
+  };
+
   return (
     <div 
       className={`movie-card ${movie._is_main ? 'main-movie' : ''}`} 
@@ -36,9 +45,9 @@ const MovieCard = ({ movie, isPlotSearch, onClick }) => {
 
       <div className="movie-poster">
         {posterUrl ? (
-          <img src={posterUrl} alt={movie.title} />
+          <img src={posterUrl} alt={movie.title} onError={handleImageError} />
         ) : (
-          <span>No Poster</span>
+          <img src={fallbackImage} alt="No Poster Available" />
         )}
       </div>
 

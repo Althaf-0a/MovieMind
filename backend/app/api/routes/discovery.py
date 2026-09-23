@@ -11,6 +11,8 @@ class DiscoveryRequest(BaseModel):
     director: Optional[str] = None
     genre: Optional[str] = None
     year: Optional[int] = None
+    min_year: Optional[int] = None
+    max_year: Optional[int] = None
     min_rating: Optional[float] = None
     top_n: int = 10
 
@@ -43,7 +45,7 @@ class DiscoveryResponse(BaseModel):
 
 @router.post("/search", response_model=DiscoveryResponse)
 async def search_discovery(request: DiscoveryRequest):
-    if not any([request.plot, request.actor, request.director, request.genre, request.year, request.min_rating]):
+    if not any([request.plot, request.actor, request.director, request.genre, request.year, request.min_year, request.max_year, request.min_rating]):
         raise HTTPException(status_code=400, detail="At least one meaningful search criterion must be provided.")
         
     try:
@@ -53,6 +55,8 @@ async def search_discovery(request: DiscoveryRequest):
             director=request.director,
             genre=request.genre,
             year=request.year,
+            min_year=request.min_year,
+            max_year=request.max_year,
             min_rating=request.min_rating,
             top_n=request.top_n
         )

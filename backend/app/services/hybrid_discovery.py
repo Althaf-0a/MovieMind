@@ -20,7 +20,7 @@ def get_movies_with_director(director_name: str):
     matches = movie_directors_df[movie_directors_df['director_name'].str.lower().str.strip() == dir_norm]
     return set(matches['tmdbId'].unique())
 
-def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: str=None, year: int=None, min_rating: float=None, top_n: int=10):
+def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: str=None, year: int=None, min_year: int=None, max_year: int=None, min_rating: float=None, top_n: int=10):
     # Import inside to avoid circular deps and rely on semantic_search being loaded
     import app.services.semantic_search as semantic_search
     from app.services.query_resolver import resolve_actor, resolve_director
@@ -101,7 +101,7 @@ def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: st
     actor_w = 20 if actor else 0
     director_w = 10 if director else 0
     genre_w = 5 if genre else 0
-    year_w = 5 if year else 0
+    year_w = 5 if (year or min_year or max_year) else 0
     
     total_w = plot_w + actor_w + director_w + genre_w + year_w
     if total_w == 0:
@@ -126,6 +126,10 @@ def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: st
         # Hard Filter: Year
         rel_year = row['release_year'] if not pd.isna(row['release_year']) else None
         if year and rel_year != year:
+            continue
+        if min_year and (rel_year is None or rel_year < min_year):
+            continue
+        if max_year and (rel_year is None or rel_year > max_year):
             continue
             
         # Hard Filter: Genre
@@ -173,9 +177,16 @@ def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: st
             reasons.append(f"Genre match: {genre}")
             
         # Year
-        if year:
+        if year or min_year or max_year:
             score_points += year_w
-            reasons.append(f"Released in {year}")
+            if year:
+                reasons.append(f"Released in {year}")
+            elif min_year and max_year:
+                reasons.append(f"Released between {min_year} and {max_year}")
+            elif min_year:
+                reasons.append(f"Released from {min_year} onwards")
+            elif max_year:
+                reasons.append(f"Released up to {max_year}")
             
         # Calculate final normalized score
         final_score = (score_points / total_w) * 100.0
