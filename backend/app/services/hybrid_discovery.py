@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from app.services.data_store import movies_master_df, movie_cast_df, movie_directors_df
+from app.services.tmdb_service import sync_discover_movies, sync_get_person_id, TMDB_GENRES
 
 def normalize_text(text: str):
     if not text: return ""
@@ -216,8 +217,105 @@ def hybrid_search(plot: str=None, actor: str=None, director: str=None, genre: st
             "match_reasons": reasons,
             "_sort_pop": pop # Hidden field for sorting
         })
-
-    # Sort descending by final score first, then popularity as a tie-breaker
+    # 4. TMDB Dual-Engine Live Search
+    valid_local_count = len(results_list)
+    needs_tmdb = (max_year is None) or (max_year > 2020) or (valid_local_count < top_n)
+    
+    if not results_list:
+        pass # empty but still iteratable
+    for r in results_list:
+        r['source'] = 'local'
+        
+    if needs_tmdb:
+        try:
+            tmdb_params = {}
+            if min_year: tmdb_params['primary_release_date.gte'] = f"{min_year}-01-01"
+            if max_year: tmdb_params['primary_release_date.lte'] = f"{max_year}-12-31"
+            elif year:
+                tmdb_params['primary_release_date.gte'] = f"{year}-01-01"
+                tmdb_params['primary_release_date.lte'] = f"{year}-12-31"
+            
+            if genre and genre.title() in TMDB_GENRES:
+                tmdb_params['with_genres'] = TMDB_GENRES[genre.title()]
+            if min_rating: tmdb_params['vote_average.gte'] = min_rating
+            
+            if resolved_actor_name:
+                actor_id = sync_get_person_id(resolved_actor_name)
+                if actor_id: tmdb_params['with_cast'] = actor_id
+            if resolved_director_name:
+                dir_id = sync_get_person_id(resolved_director_name)
+                if dir_id: tmdb_params['with_crew'] = dir_id
+                
+            tmdb_movies = sync_discover_movies(tmdb_params)
+            
+            if plot and tmdb_movies:
+                tmdb_overviews = [m.get('overview', '').strip() for m in tmdb_movies]
+                valid_tmdb_movies = [m for m, text in zip(tmdb_movies, tmdb_overviews) if text]
+                valid_overviews = [text for text in tmdb_overviews if text]
+                
+                if valid_overviews:
+                    tmdb_scores = semantic_search.score_external_texts(query_vector, valid_overviews)
+                    
+                    local_ids = {r['id']: r for r in results_list}
+                    
+                    for i, t_movie in enumerate(valid_tmdb_movies):
+                        t_id = t_movie.get('id')
+                        t_score = tmdb_scores[i]
+                        
+                        score_points = 0.0
+                        reasons = []
+                        norm_plot = max(0, min(1.0, float(t_score)))
+                        score_points += norm_plot * plot_w
+                        
+                        if norm_plot > 0.4: reasons.append("Strong plot similarity")
+                        elif norm_plot > 0.2: reasons.append("Moderate plot similarity")
+                        
+                        if actor_w: score_points += actor_w; reasons.append(f"Starring {resolved_actor_name}")
+                        if director_w: score_points += director_w; reasons.append(f"Directed by {resolved_director_name}")
+                        if genre_w: score_points += genre_w; reasons.append(f"Genre match: {genre}")
+                        if year_w: score_points += year_w; reasons.append("Year match")
+                        
+                        final_score = (score_points / total_w) * 100.0
+                        final_score = min(100.0, max(0.0, final_score))
+                        pop = t_movie.get('popularity', 0.0)
+                        
+                        if t_id in local_ids:
+                            # Deduplicate: prefer local metadata, update source, optionally adopt TMDB poster
+                            local_ids[t_id]['source'] = 'both'
+                            if t_movie.get('poster_path'):
+                                local_ids[t_id]['poster_path'] = t_movie['poster_path']
+                        else:
+                            try:
+                                rel_year_tmdb = int(t_movie.get('release_date', '0')[:4])
+                            except:
+                                rel_year_tmdb = None
+                                
+                            new_r = {
+                                "id": int(t_id),
+                                "title": t_movie.get('title', ''),
+                                "original_title": t_movie.get('original_title', ''),
+                                "release_year": rel_year_tmdb,
+                                "genres_text": genre if genre else "TMDB Extracted",
+                                "overview_text": t_movie.get('overview', ''),
+                                "vote_average": t_movie.get('vote_average', 0.0),
+                                "vote_count": t_movie.get('vote_count', 0),
+                                "popularity": pop,
+                                "poster_path": t_movie.get('poster_path'),
+                                "final_score": final_score,
+                                "plot_similarity": round(t_score, 3),
+                                "actor_match": bool(actor_w),
+                                "director_match": bool(director_w),
+                                "genre_match": bool(genre_w),
+                                "match_reasons": reasons,
+                                "source": "tmdb",
+                                "_sort_pop": pop
+                            }
+                            results_list.append(new_r)
+        except Exception as e:
+            # TMDB Failures must NEVER break MovieMind. Swallow exception.
+            print(f"TMDB Fetch Error: {e}")
+            pass
+            
     results_list.sort(key=lambda x: (x['final_score'], x['_sort_pop']), reverse=True)
     
     # Clean up the hidden sort key

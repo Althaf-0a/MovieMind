@@ -186,3 +186,31 @@ def search_similar_by_tmdb_id(tmdb_id: int, min_year: int = None, max_year: int 
             })
             
     return results
+
+def score_external_texts(query_vector, texts: list):
+    """
+    Dynamically embeds a list of external texts, L2 normalizes them exactly like the FAISS index,
+    and returns a list of cosine similarity scores against the provided query vector.
+    """
+    if not texts:
+        return []
+    
+    text_vectors = semantic_model.encode(texts)
+    text_vectors = np.array(text_vectors, dtype=np.float32)
+    if len(text_vectors.shape) == 1:
+        text_vectors = text_vectors.reshape(1, -1)
+    
+    faiss.normalize_L2(text_vectors)
+    
+    # Query vector is already L2 normalized in search_faiss, or earlier
+    # wait, query_vector passed here might not be normalized yet if caller didn't normalize it!
+    # Let's make sure it is normalized
+    query_vector_copy = np.copy(query_vector).astype(np.float32)
+    if len(query_vector_copy.shape) == 1:
+        query_vector_copy = query_vector_copy.reshape(1, -1)
+    faiss.normalize_L2(query_vector_copy)
+    
+    # Compute dot product (Cosine Similarity since both are L2 normalized)
+    scores = np.dot(text_vectors, query_vector_copy.T).flatten()
+    return scores.tolist()
+
