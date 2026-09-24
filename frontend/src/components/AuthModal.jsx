@@ -2,28 +2,30 @@ import React, { useState } from 'react';
 import { loginUser, registerUser } from '../services/api';
 import './AuthModal.css';
 
-const AuthModal = ({ onClose, onLoginSuccess }) => {
-  const [isLogin, setIsLogin] = useState(true);
+const AuthModal = ({ onClose, onLoginSuccess, initialMode = true }) => {
+  const [isLogin, setIsLogin] = useState(initialMode);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [successMsg, setSuccessMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
     setLoading(true);
     
     try {
       if (isLogin) {
         const data = await loginUser(username, password);
-        localStorage.setItem('moviemind_token', data.access_token);
+        sessionStorage.setItem('moviemind_token', data.access_token);
         onLoginSuccess();
       } else {
         await registerUser(username, password);
-        const data = await loginUser(username, password);
-        localStorage.setItem('moviemind_token', data.access_token);
-        onLoginSuccess();
+        setSuccessMsg("Account created successfully. Please log in.");
+        setIsLogin(true);
+        setPassword('');
       }
     } catch (err) {
       if (err.response && err.response.data && err.response.data.detail) {
@@ -45,6 +47,7 @@ const AuthModal = ({ onClose, onLoginSuccess }) => {
         <h2 className="auth-title">{isLogin ? 'Welcome Back' : 'Create Account'}</h2>
         
         {error && <div className="auth-error">{error}</div>}
+        {successMsg && <div className="auth-success">{successMsg}</div>}
         
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="auth-input-group">
@@ -73,7 +76,8 @@ const AuthModal = ({ onClose, onLoginSuccess }) => {
         
         <p className="auth-toggle">
           {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <span onClick={() => { setIsLogin(!isLogin); setError(null); }}>
+          <span onClick={() => { setIsLogin(!isLogin); setError(null);
+    setSuccessMsg(null); }}>
             {isLogin ? 'Register here' : 'Login here'}
           </span>
         </p>
