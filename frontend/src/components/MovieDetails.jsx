@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getLocalMovieDetails, getRecommendations as getLocalRecommendations, getTmdbMovieDetails, getRelatedMovies as getTmdbRelatedMovies } from '../services/api';
 import MovieCard from './MovieCard';
 
-const MovieDetails = ({ movie, onBack }) => {
+const MovieDetails = ({ movie, onBack, isSaved, onToggleWatchlist }) => {
+  const [isToggling, setIsToggling] = useState(false);
   const [details, setDetails] = useState(null);
   const [similar, setSimilar] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +97,22 @@ const MovieDetails = ({ movie, onBack }) => {
     }
   };
 
+
+  const handleToggle = async (e) => {
+    e.stopPropagation();
+    if (isToggling) return;
+    setIsToggling(true);
+    try {
+      if (onToggleWatchlist) {
+        await onToggleWatchlist(movie);
+      }
+    } catch (err) {
+      console.error("Failed to toggle watchlist", err);
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
   return (
     <div className="movie-details-view">
       <button className="btn-back" onClick={onBack}>&larr; Back to Results</button>
@@ -110,7 +127,16 @@ const MovieDetails = ({ movie, onBack }) => {
         </div>
         
         <div className="details-info">
-          <h1>{title} {releaseYear ? `(${releaseYear})` : ''}</h1>
+          <div className="title-row" style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
+            <h1 style={{ margin: 0 }}>{title} {releaseYear ? `(${releaseYear})` : ''}</h1>
+            <button 
+              className={`watchlist-boxed-btn ${isSaved ? 'saved' : ''}`}
+              onClick={handleToggle}
+              disabled={isToggling}
+            >
+              {isToggling ? '...' : (isSaved ? '\u2665 Saved' : '\u2661 Save to Watchlist')}
+            </button>
+          </div>
           <div className={`source-badge ${movie._source === 'TMDB' ? 'tmdb-badge' : 'local-badge'}`}>
             Source: {movie._source || 'MovieMind Database'}
           </div>
@@ -139,7 +165,7 @@ const MovieDetails = ({ movie, onBack }) => {
                 ...simMovie,
                 _source: movie._source
               };
-              return <MovieCard key={simMovie.id || simMovie.tmdbId || idx} movie={mappedMovie} isPlotSearch={false} />;
+              return <MovieCard key={simMovie.tmdb_id || simMovie.tmdbId || simMovie.id || idx} movie={mappedMovie} isPlotSearch={false} isSaved={false} />;
             })}
           </div>
         </div>

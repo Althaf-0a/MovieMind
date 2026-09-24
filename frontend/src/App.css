@@ -801,3 +801,162 @@ textarea.hero-input {
   margin: 0;
 }
 
+
+/* Phase 8 Responsive Fixes */
+.movie-details-view, .app-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.details-header {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.details-info, .movie-card-content {
+  min-width: 0; 
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.details-info p, .title-row h1, .movie-card-content h3, .movie-card-content p {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.search-footer, .advanced-filters {
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  flex-wrap: wrap;
+  min-width: 120px;
+}
+
+.movie-header {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .details-header {
+    flex-direction: column;
+    padding: 1.5rem;
+    gap: 2rem;
+  }
+  .details-poster {
+    max-width: 100%;
+  }
+  .title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Phase 9 Header & Auth Buttons */
+.auth-user-section {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.welcome-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.welcome-text {
+  font-size: 0.85rem;
+  color: #a79cce;
+}
+.username-text {
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.auth-buttons {
+  display: flex;
+  gap: 12px;
+}
+.boxed-btn {
+  background-color: #9275e3;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.boxed-btn:hover {
+  background-color: #b59fff;
+  transform: translateY(-1px);
+}
+.boxed-btn.outline {
+  background-color: transparent;
+  border: 1px solid #9275e3;
+  color: #9275e3;
+}
+.boxed-btn.outline:hover {
+  background-color: rgba(146, 117, 227, 0.1);
+  color: #b59fff;
+}
+.back-btn {
+  display: inline-block;
+  margin-bottom: 20px;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  .auth-user-section {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .welcome-block {
+    align-items: center;
+  }
+  .auth-controls {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+
+/* Phase 10 Compact Watchlist Button */
+.watchlist-boxed-btn {
+  background-color: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.watchlist-boxed-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: #fff;
+  transform: translateY(-1px);
+}
+.watchlist-boxed-btn.saved {
+  background-color: rgba(229, 9, 20, 0.1);
+  color: #e50914;
+  border-color: #e50914;
+}
+.watchlist-boxed-btn.saved:hover {
+  background-color: #e50914;
+  color: #fff;
+}
+

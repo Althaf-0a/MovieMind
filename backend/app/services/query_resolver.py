@@ -13,11 +13,12 @@ _NORM_DIRECTORS_MAP = {}
 _NORM_TITLES_MAP = {}
 
 def normalize_text(text: str) -> str:
-    """Lowercase, strip, collapse spaces, remove basic punctuation."""
+    """Lowercase, strip, replace punctuation with spaces, collapse spaces."""
     if not text or not isinstance(text, str):
         return ""
     text = text.lower()
-    text = re.sub(r'[^\w\s]', '', text)
+    # Replace anything that isn't a letter or number with a space
+    text = re.sub(r'[^a-z0-9]', ' ', text)
     return " ".join(text.split())
 
 def init_resolver():
@@ -129,4 +130,4 @@ def resolve_director(query: str) -> dict:
 def resolve_title(query: str) -> dict:
     init_resolver()
     # High threshold for titles to avoid "Spider-Man No Way Home" -> "Spider-Man"
-    return _resolve_generic(query, _NORM_TITLES_MAP, threshold=90.0)
+    return _resolve_generic(query, _NORM_TITLES_MAP, threshold=95.0)

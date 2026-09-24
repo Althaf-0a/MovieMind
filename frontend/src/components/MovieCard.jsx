@@ -2,7 +2,7 @@ import React from 'react';
 
 import { useState } from "react";
 
-const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist }) => {
+const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist, isWatchlistView }) => {
   const [isToggling, setIsToggling] = useState(false);
   let genresText = '';
   if (typeof movie.genres_text === 'string') {
@@ -59,10 +59,6 @@ const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist })
       className={`movie-card ${movie._is_main ? 'main-movie' : ''}`} 
       onClick={() => onClick && onClick(movie)}
     >
-      <div className="source-indicator">
-        {movie._is_main ? 'MAIN MOVIE (TMDB)' : (movie._source || 'MovieMind Database')}
-      </div>
-
       <div className="movie-poster">
         {posterUrl ? (
           <img src={posterUrl} alt={movie.title} onError={handleImageError} />
@@ -72,14 +68,20 @@ const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist })
       </div>
 
       <div className="movie-details-content">
-        <div className="movie-header">
-          <h3>{movie.title} {releaseYear ? `(${releaseYear})` : ''}</h3>
+        <div className="movie-header" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+          <div className="movie-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+            <h3 style={{ margin: 0, minWidth: 0, flex: 1, overflowWrap: 'anywhere' }}>{movie.title} {releaseYear ? `(${releaseYear})` : ''}</h3>
+            <span className="source-indicator-inline" style={{ fontSize: '0.75rem', padding: '4px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', whiteSpace: 'nowrap' }}>
+              {movie._is_main ? 'TMDB MAIN' : (movie._source || 'Local DB')}
+            </span>
+          </div>
           <button 
-            className={`watchlist-btn ${isSaved ? 'saved' : ''}`}
+            className={`watchlist-boxed-btn ${isSaved ? 'saved' : ''}`}
             onClick={handleToggle}
             disabled={isToggling}
+            style={{ alignSelf: 'flex-start' }}
           >
-            {isToggling ? '...' : (isSaved ? '♥ Saved' : '♡ Save')}
+            {isToggling ? '...' : (isWatchlistView && isSaved ? '\u2665 Remove from Watchlist' : (isSaved ? '\u2665 Saved' : '\u2661 Save to Watchlist'))}
           </button>
         </div>
         <p><strong>Genres:</strong> {genresText || 'Unknown'}</p>
@@ -128,3 +130,4 @@ const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist })
 };
 
 export default MovieCard;
+

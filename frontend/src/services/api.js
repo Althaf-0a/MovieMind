@@ -5,7 +5,7 @@ const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
 // Automatically attach JWT token to all requests if present
 axios.interceptors.request.use((config) => {
-  const token = localStorage.getItem('moviemind_token');
+  const token = sessionStorage.getItem('moviemind_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -180,4 +180,12 @@ export const removeFromWatchlist = async (tmdbId) => {
   const response = await axios.delete(API_BASE_URL + '/watchlist/' + tmdbId);
   return response.data;
 };
+
+
+
+export const getSuggestedMovies = async () => {
+  const response = await api.get('/recommendations/personalized');
+  return response.data;
+};
+
 
