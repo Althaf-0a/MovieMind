@@ -184,8 +184,9 @@ export const removeFromWatchlist = async (tmdbId) => {
 
 
 export const getSuggestedMovies = async () => {
-  const response = await api.get('/recommendations/personalized');
+  const response = await axios.get(API_BASE_URL + '/recommendations/personalized');
   return response.data;
 };
+
 
 

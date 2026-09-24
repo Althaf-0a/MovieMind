@@ -10,7 +10,7 @@ import {
 import MovieCard from './components/MovieCard'
 import MovieDetails from './components/MovieDetails'
 import AuthModal from './components/AuthModal'
-import { getCurrentUser, getWatchlist, addToWatchlist, removeFromWatchlist } from './services/api'
+import { getCurrentUser, getWatchlist, addToWatchlist, removeFromWatchlist, getSuggestedMovies } from './services/api'
 import { useEffect } from 'react'
 
 
@@ -159,7 +159,7 @@ const handleToggleWatchlist = async (movie) => {
         setSuggestedMovies(items)
       } catch (err) {
         console.error(err)
-        setError("Failed to load suggested movies.")
+        setError("Failed to load suggested movies: " + (err.message || err.toString()))
       } finally {
         setIsLoading(false)
       }
@@ -316,13 +316,15 @@ const handleToggleWatchlist = async (movie) => {
       
         {currentMode === MODES.SUGGESTED && (
           <section className="suggested-section">
-            <div className="watchlist-header">
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <h2>Suggested Movies For You</h2>
-                <p style={{ color: '#a79cce', marginTop: '-10px', marginBottom: '20px' }}>Recommendations based on the movies in your watchlist.</p>
+            <div className="suggested-header" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
+                <div>
+                  <h2 style={{ margin: '0 0 0.5rem 0' }}>Suggested Movies For You</h2>
+                  <p style={{ color: '#a79cce', margin: 0 }}>Recommendations based on the movies in your watchlist.</p>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <button className="header-btn boxed-btn outline back-btn" onClick={() => handleModeChange(MODES.STORY)}>&#8592; Back to Discover</button>
+                </div>
               </div>
-              <button className="header-btn boxed-btn outline back-btn" onClick={() => handleModeChange(MODES.STORY)}>&#8592; Back to Discover</button>
-            </div>
             
             {isLoading && <div className="loading">Loading your personalized suggestions...</div>}
             {!isLoading && error && <div className="error">{error}</div>}
@@ -577,4 +579,6 @@ const handleToggleWatchlist = async (movie) => {
 }
 
 export default App
+
+
 

@@ -114,14 +114,21 @@ const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist, i
           </div>
         )}
         
-        {(movie.similarity_score !== undefined || movie.match_score !== undefined || movie.final_score !== undefined) && (
+        {(movie.related_to_title || movie.similarity_score !== undefined || movie.match_score !== undefined || movie.final_score !== undefined) && (
           <div className="similarity">
+            {movie.related_to_title && (
+              <div style={{ marginBottom: '4px' }}>
+                <strong>Related to:</strong> {movie.related_to_title}
+              </div>
+            )}
             <strong>Match Score:</strong>{' '}
-            {movie.final_score !== undefined
-              ? `${Number(movie.final_score).toFixed(1)}%`
-              : movie.match_score !== undefined 
-                ? `${Number(movie.match_score).toFixed(1)}%` 
-                : `${(Number(movie.similarity_score) * 100).toFixed(1)}%`}
+            {movie.related_to_score !== undefined
+              ? `${Number(movie.related_to_score).toFixed(1)}%`
+              : movie.final_score !== undefined
+                ? `${Number(movie.final_score).toFixed(1)}%`
+                : movie.match_score !== undefined 
+                  ? `${Number(movie.match_score).toFixed(1)}%` 
+                  : `${(Number(movie.similarity_score) * 100).toFixed(1)}%`}
           </div>
         )}
       </div>

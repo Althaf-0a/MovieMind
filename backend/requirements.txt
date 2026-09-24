@@ -1,12 +1,17 @@
 fastapi
 uvicorn
+pydantic
 pandas
+numpy
 scikit-learn
 rapidfuzz
 sentence-transformers
+faiss-cpu
+requests
 httpx
 python-dotenv
 sqlalchemy
 passlib[bcrypt]
+bcrypt==3.2.2
 python-jose[cryptography]
 python-multipart

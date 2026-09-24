@@ -17,11 +17,14 @@ async def get_personalized_recommendations(watchlist_items, limit=20):
         return []
         
     vectors = []
+    watchlist_vectors_info = [] # Store tuples of (title, vector)
     watchlist_tmdb_ids = set()
     
     for item in watchlist_items:
         tmdb_id = item.tmdb_id
         watchlist_tmdb_ids.add(tmdb_id)
+        
+        vec = None
         
         # Check if in local FAISS DB
         matching_indices = semantic_search.embedding_index[semantic_search.embedding_index['tmdbId'] == tmdb_id].index.tolist()
@@ -30,11 +33,10 @@ async def get_personalized_recommendations(watchlist_items, limit=20):
             # We have it locally
             idx = matching_indices[0]
             vec = semantic_search.movie_embeddings[idx]
-            vectors.append(vec)
         else:
             # TMDB-only movie, check cache
             if tmdb_id in _tmdb_embedding_cache:
-                vectors.append(_tmdb_embedding_cache[tmdb_id])
+                vec = _tmdb_embedding_cache[tmdb_id]
             else:
                 # Fetch dynamically
                 try:
@@ -42,13 +44,17 @@ async def get_personalized_recommendations(watchlist_items, limit=20):
                     overview = details.get('overview', '')
                     if overview:
                         # Encode it
-                        vec = semantic_search.semantic_model.encode([overview])[0]
+                        encoded_vec = semantic_search.semantic_model.encode([overview])[0]
                         # Normalize single vector
-                        vec = vec / np.linalg.norm(vec)
-                        _tmdb_embedding_cache[tmdb_id] = vec
-                        vectors.append(vec)
+                        encoded_vec = encoded_vec / np.linalg.norm(encoded_vec)
+                        _tmdb_embedding_cache[tmdb_id] = encoded_vec
+                        vec = encoded_vec
                 except Exception as e:
                     print(f"Failed to fetch/encode TMDB movie {tmdb_id}: {e}")
+                    
+        if vec is not None:
+            vectors.append(vec)
+            watchlist_vectors_info.append((item.title, vec))
                     
     if not vectors:
         return []
@@ -81,6 +87,19 @@ async def get_personalized_recommendations(watchlist_items, limit=20):
         if cand_tmdb_id in master_df_indexed.index:
             row = master_df_indexed.loc[cand_tmdb_id]
             
+            # Find closest watchlist movie
+            cand_vec = semantic_search.movie_embeddings[idx]
+            best_wl_title = None
+            best_wl_score = -1.0
+            
+            for wl_title, wl_vec in watchlist_vectors_info:
+                sim = np.dot(cand_vec, wl_vec)
+                if sim > best_wl_score:
+                    best_wl_score = sim
+                    best_wl_title = wl_title
+                    
+            related_to_score_percentage = round(float(best_wl_score) * 100, 1) if best_wl_title else 0.0
+            
             # Map back to our normalized schema
             results.append({
                 "tmdbId": cand_tmdb_id,
@@ -93,6 +112,8 @@ async def get_personalized_recommendations(watchlist_items, limit=20):
                 "vote_count": int(row['vote_count']) if 'vote_count' in row else 0,
                 "poster_path": row['poster_path'] if 'poster_path' in row else '',
                 "similarity_score": float(score),
+                "related_to_title": best_wl_title,
+                "related_to_score": related_to_score_percentage,
                 "_source": 'MovieMind Database'
             })
             
