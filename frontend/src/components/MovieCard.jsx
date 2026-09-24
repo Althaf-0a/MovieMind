@@ -1,6 +1,9 @@
 import React from 'react';
 
-const MovieCard = ({ movie, isPlotSearch, onClick }) => {
+import { useState } from "react";
+
+const MovieCard = ({ movie, isPlotSearch, onClick, isSaved, onToggleWatchlist }) => {
+  const [isToggling, setIsToggling] = useState(false);
   let genresText = '';
   if (typeof movie.genres_text === 'string') {
     genresText = movie.genres_text;
@@ -21,6 +24,23 @@ const MovieCard = ({ movie, isPlotSearch, onClick }) => {
       ? `https://image.tmdb.org/t/p/w500${movie.poster_path}`
       : movie.poster_path;
   }
+
+  
+
+  const handleToggle = async (e) => {
+    e.stopPropagation();
+    if (isToggling) return;
+    setIsToggling(true);
+    try {
+      if (onToggleWatchlist) {
+        await onToggleWatchlist(movie);
+      }
+    } catch (err) {
+      console.error("Failed to toggle watchlist", err);
+    } finally {
+      setIsToggling(false);
+    }
+  };
 
   const overview = movie.overview_text || movie.overview;
   const showOverview = isPlotSearch || movie._source === 'TMDB';
@@ -52,7 +72,16 @@ const MovieCard = ({ movie, isPlotSearch, onClick }) => {
       </div>
 
       <div className="movie-details-content">
-        <h3>{movie.title} {releaseYear ? `(${releaseYear})` : ''}</h3>
+        <div className="movie-header">
+          <h3>{movie.title} {releaseYear ? `(${releaseYear})` : ''}</h3>
+          <button 
+            className={`watchlist-btn ${isSaved ? 'saved' : ''}`}
+            onClick={handleToggle}
+            disabled={isToggling}
+          >
+            {isToggling ? '...' : (isSaved ? '♥ Saved' : '♡ Save')}
+          </button>
+        </div>
         <p><strong>Genres:</strong> {genresText || 'Unknown'}</p>
         
         {showOverview && overview && (

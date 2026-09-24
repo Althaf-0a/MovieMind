@@ -2,6 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.health import router as health_router
+from app.api.routes.auth import router as auth_router
+from app.api.routes.watchlist import router as watchlist_router
+
+from app.database import engine
+from app import models
+
+# Create all database tables
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="MovieMind API",
@@ -25,6 +33,12 @@ app.add_middleware(
 
 # Health checks live under /api, for example GET /api/health
 app.include_router(health_router, prefix="/api")
+
+# Authentication endpoints
+app.include_router(auth_router, prefix="/api/auth")
+
+# Watchlist endpoints
+app.include_router(watchlist_router, prefix="/api/watchlist")
 
 # Movie recommendations endpoint
 from app.api.routes.recommendations import router as recommendations_router
