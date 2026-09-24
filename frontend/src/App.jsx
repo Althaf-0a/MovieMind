@@ -9,12 +9,17 @@ import {
 } from './services/api'
 import MovieCard from './components/MovieCard'
 import MovieDetails from './components/MovieDetails'
+import AuthModal from './components/AuthModal'
+import { getCurrentUser, getWatchlist, addToWatchlist, removeFromWatchlist } from './services/api'
+import { useEffect } from 'react'
+
 
 const MODES = {
   STORY: 'STORY',
   TITLE: 'TITLE',
   ACTOR: 'ACTOR',
   DIRECTOR: 'DIRECTOR',
+  WATCHLIST: 'WATCHLIST',
 }
 
 function App() {
@@ -37,11 +42,110 @@ function App() {
   const [requestedQuery, setRequestedQuery] = useState('')
   const [selectedMovie, setSelectedMovie] = useState(null)
 
-  const handleModeChange = (mode) => {
+  const [currentUser, setCurrentUser] = useState(null)
+  const [watchlist, setWatchlist] = useState(new Set())
+  const [watchlistMovies, setWatchlistMovies] = useState([])
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const token = localStorage.getItem('moviemind_token')
+      if (token) {
+        try {
+          const user = await getCurrentUser()
+          setCurrentUser(user)
+          
+          try {
+            const savedItems = await getWatchlist()
+            const tmdbIds = new Set(savedItems.map(item => item.tmdb_id))
+            setWatchlist(tmdbIds)
+          } catch (watchErr) {
+            console.error("Failed to fetch watchlist:", watchErr)
+          }
+          
+        } catch (err) {
+          localStorage.removeItem('moviemind_token')
+          setCurrentUser(null)
+        }
+      }
+      setIsAuthLoading(false)
+    }
+    initAuth()
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem('moviemind_token')
+    setCurrentUser(null)
+    setWatchlist(new Set())
+    setCurrentMode(MODES.STORY)
+  }
+
+
+const handleToggleWatchlist = async (movie) => {
+    if (!currentUser) {
+      setShowAuthModal(true)
+      return
+    }
+    
+    const tmdbId = movie.id || movie.tmdbId
+    const isSaved = watchlist.has(tmdbId)
+    
+    try {
+      if (isSaved) {
+        await removeFromWatchlist(tmdbId)
+        setWatchlist(prev => {
+          const next = new Set(prev)
+          next.delete(tmdbId)
+          return next
+        })
+      } else {
+        const payload = {
+          tmdb_id: tmdbId,
+          title: movie.title || movie.original_title,
+          release_year: movie.release_year || (movie.release_date ? parseInt(movie.release_date.split('-')[0]) : null),
+          poster_path: movie.poster_path,
+          source: movie.source || (movie._source === 'TMDB' ? 'tmdb' : 'local')
+        }
+        await addToWatchlist(payload)
+        setWatchlist(prev => {
+          const next = new Set(prev)
+          next.add(tmdbId)
+          return next
+        })
+      }
+    } catch (err) {
+      console.error("Error toggling watchlist:", err)
+      alert("Failed to update watchlist. Please try again.")
+    }
+  }
+
+  const handleModeChange = async (mode) => {
     setCurrentMode(mode)
     setQuery('')
     setResults([])
     setError(null)
+    setSelectedMovie(null)
+
+    if (mode === MODES.WATCHLIST) {
+      setIsLoading(true)
+      try {
+        const items = await getWatchlist()
+        setWatchlistMovies(items.map(item => ({
+          id: item.tmdb_id,
+          tmdbId: item.tmdb_id,
+          title: item.title,
+          release_year: item.release_year,
+          poster_path: item.poster_path,
+          source: item.source,
+          _source: item.source === 'tmdb' ? 'TMDB' : 'MovieMind Database'
+        })))
+      } catch (err) {
+        setError("Failed to load watchlist.")
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
   const handleSearch = async (e) => {
@@ -128,9 +232,40 @@ function App() {
         <header className="app-header">
           <h1 className="logo-text"><span>Movie</span>Mind</h1>
           <p className="subtitle">AI-Powered Cinema Discovery</p>
-        </header>
+        
+          <div className="auth-controls">
+              {!isAuthLoading && (
+                currentUser ? (
+                  <>
+                    <span className="welcome-text">Welcome, {currentUser.username}</span>
+                    <button className="header-btn" onClick={() => handleModeChange(MODES.WATCHLIST)}>My Watchlist</button>
+                    <button className="header-btn" onClick={handleLogout}>Logout</button>
+                  </>
+                ) : (
+                  <button className="header-btn" onClick={() => setShowAuthModal(true)}>Login / Register</button>
+                )
+              )}
+            </div>
+</header>
         <MovieDetails movie={selectedMovie} onBack={() => setSelectedMovie(null)} />
-      </main>
+      
+      {showAuthModal && (
+        <AuthModal 
+          onClose={() => setShowAuthModal(false)}
+          onLoginSuccess={async () => {
+            setShowAuthModal(false)
+            try {
+              const user = await getCurrentUser()
+              setCurrentUser(user)
+              const savedItems = await getWatchlist()
+              setWatchlist(new Set(savedItems.map(item => item.tmdb_id)))
+            } catch (err) {
+              console.error(err)
+            }
+          }}
+        />
+      )}
+    </main>
     )
   }
 
@@ -139,9 +274,58 @@ function App() {
       <header className="app-header">
         <h1 className="logo-text"><span>Movie</span>Mind</h1>
         <p className="subtitle">Find a movie from the story you remember.</p>
-      </header>
+      
+          <div className="auth-controls">
+              {!isAuthLoading && (
+                currentUser ? (
+                  <>
+                    <span className="welcome-text">Welcome, {currentUser.username}</span>
+                    <button className="header-btn" onClick={() => handleModeChange(MODES.WATCHLIST)}>My Watchlist</button>
+                    <button className="header-btn" onClick={handleLogout}>Logout</button>
+                  </>
+                ) : (
+                  <button className="header-btn" onClick={() => setShowAuthModal(true)}>Login / Register</button>
+                )
+              )}
+            </div>
+</header>
 
-      <section className="search-section">
+      
+        {currentMode === MODES.WATCHLIST && (
+          <section className="watchlist-section">
+            <div className="watchlist-header">
+              <h2>My Watchlist</h2>
+              <button className="header-btn" onClick={() => handleModeChange(MODES.STORY)}>Back to Discover</button>
+            </div>
+            {isLoading && <div className="loading">Loading your watchlist...</div>}
+            {currentMode !== MODES.WATCHLIST && error && <div className="error">{error}</div>}
+            {!isLoading && !error && watchlistMovies.filter(m => watchlist.has(m.id)).length === 0 && (
+              <div className="empty-watchlist">
+                <h3>Your watchlist is empty</h3>
+                <p>Discover great movies and save them here for later.</p>
+                <button className="header-btn" onClick={() => handleModeChange(MODES.STORY)}>Discover Movies</button>
+              </div>
+            )}
+            {!isLoading && watchlistMovies.filter(m => watchlist.has(m.id)).length > 0 && (
+              <div className="results-grid">
+                {watchlistMovies.filter(m => watchlist.has(m.id)).map(movie => (
+                  <MovieCard 
+                    key={movie.id} 
+                    movie={movie} 
+                    isPlotSearch={false} 
+                    onClick={setSelectedMovie}
+                    isSaved={watchlist.has(movie.id || movie.tmdbId)}
+                    onToggleWatchlist={handleToggleWatchlist}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {currentMode !== MODES.WATCHLIST && (
+          <section className="search-section">
+
         {/* Modern Tab Selector */}
         <div className="tabs">
           <button className={`tab ${currentMode === MODES.STORY ? 'active' : ''}`} onClick={() => handleModeChange(MODES.STORY)}>Story & Details</button>
@@ -264,22 +448,23 @@ function App() {
           </div>
         </form>
       </section>
+      )}
 
-      {error && (
+      {currentMode !== MODES.WATCHLIST && error && (
         <div className="state-message error">
           <div className="icon">⚠️</div>
           <p>{error}</p>
         </div>
       )}
       
-      {isLoading && (
+      {currentMode !== MODES.WATCHLIST && isLoading && (
         <div className="state-message loading">
           <div className="spinner-large"></div>
           <p>Analyzing cinematic vectors...</p>
         </div>
       )}
 
-      {!isLoading && results.length > 0 && (
+      {currentMode !== MODES.WATCHLIST && !isLoading && results.length > 0 && (
         <section className="results-section">
           <h2>
             {requestedQuery 
@@ -293,10 +478,29 @@ function App() {
                 movie={movie} 
                 isPlotSearch={currentMode === MODES.STORY} 
                 onClick={setSelectedMovie}
+                isSaved={watchlist.has(movie.id || movie.tmdbId)}
+                onToggleWatchlist={handleToggleWatchlist}
               />
             ))}
           </div>
         </section>
+      )}
+    
+      {showAuthModal && (
+        <AuthModal 
+          onClose={() => setShowAuthModal(false)}
+          onLoginSuccess={async () => {
+            setShowAuthModal(false)
+            try {
+              const user = await getCurrentUser()
+              setCurrentUser(user)
+              const savedItems = await getWatchlist()
+              setWatchlist(new Set(savedItems.map(item => item.tmdb_id)))
+            } catch (err) {
+              console.error(err)
+            }
+          }}
+        />
       )}
     </main>
   )

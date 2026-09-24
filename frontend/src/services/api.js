@@ -3,6 +3,17 @@ import axios from 'axios';
 // Keep the backend base URL centralized.
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
+// Automatically attach JWT token to all requests if present
+axios.interceptors.request.use((config) => {
+  const token = localStorage.getItem('moviemind_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
 /**
  * Fetches movie recommendations (Similar Movies mode).
  */
@@ -130,3 +141,43 @@ export const getMovies = async (page = 1, limit = 20, genre, year, minRating, mi
   });
   return response.data;
 };
+
+/**
+ * Auth API
+ */
+export const registerUser = async (username, password) => {
+  const response = await axios.post(API_BASE_URL + '/auth/register', { username, password });
+  return response.data;
+};
+
+export const loginUser = async (username, password) => {
+  const params = new URLSearchParams();
+  params.append('username', username);
+  params.append('password', password);
+  const response = await axios.post(API_BASE_URL + '/auth/token', params, {
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+  });
+  return response.data;
+};
+
+export const getCurrentUser = async () => {
+  const response = await axios.get(API_BASE_URL + '/auth/me');
+  return response.data;
+};
+
+
+export const getWatchlist = async () => {
+  const response = await axios.get(API_BASE_URL + '/watchlist');
+  return response.data;
+};
+
+export const addToWatchlist = async (movieData) => {
+  const response = await axios.post(API_BASE_URL + '/watchlist', movieData);
+  return response.data;
+};
+
+export const removeFromWatchlist = async (tmdbId) => {
+  const response = await axios.delete(API_BASE_URL + '/watchlist/' + tmdbId);
+  return response.data;
+};
+
