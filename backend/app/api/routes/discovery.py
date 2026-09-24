@@ -36,6 +36,7 @@ class DiscoveryResult(BaseModel):
     director_match: bool
     genre_match: bool
     match_reasons: List[str]
+    source: Optional[str] = "local"
 
 class DiscoveryResponse(BaseModel):
     query: dict

@@ -122,3 +122,76 @@ async def search_people(query: str, page: int = 1):
         "total_pages": data.get("total_pages"),
         "results": data.get("results", [])
     }
+
+TMDB_GENRES = {
+    "Action": 28, "Adventure": 12, "Animation": 16, "Comedy": 35,
+    "Crime": 80, "Documentary": 99, "Drama": 18, "Family": 10751,
+    "Fantasy": 14, "History": 36, "Horror": 27, "Music": 10402,
+    "Mystery": 9648, "Romance": 10749, "Science Fiction": 878,
+    "TV Movie": 10770, "Thriller": 53, "War": 10752, "Western": 37
+}
+
+def sync_fetch(url, params):
+    for attempt in range(3):
+        try:
+            r = requests.get(url, headers=HEADERS, params=params, timeout=5.0, verify=False)
+            r.raise_for_status()
+            return r.json()
+        except Exception:
+            if attempt == 2:
+                return {}
+
+def sync_get_person_id(name: str):
+    if not name: return None
+    url = f"{TMDB_BASE_URL}/3/search/person"
+    params = {"query": name, "include_adult": "false", "page": 1}
+    data = sync_fetch(url, params)
+    results = data.get("results", [])
+    if results:
+        return results[0].get("id")
+    return None
+
+import concurrent.futures
+
+def sync_discover_movies(params: dict, max_pages: int = 10):
+    url = f"{TMDB_BASE_URL}/3/discover/movie"
+    # force english text for our english model, sort by popularity
+    p = {
+        "language": "en-US",
+        "sort_by": "popularity.desc",
+        "include_adult": "false",
+        "vote_count.gte": 10 # filter out spam
+    }
+    p.update(params)
+    
+    movies = []
+    
+    # Fetch page 1
+    p1 = p.copy()
+    p1["page"] = 1
+    data1 = sync_fetch(url, p1)
+    if not data1:
+        return []
+        
+    movies.extend([format_movie(m) for m in data1.get("results", [])])
+    
+    total_pages = data1.get("total_pages", 1)
+    fetch_pages = min(max_pages, total_pages)
+    
+    if fetch_pages > 1:
+        def fetch_page(page_num):
+            page_p = p.copy()
+            page_p["page"] = page_num
+            d = sync_fetch(url, page_p)
+            return [format_movie(m) for m in d.get("results", [])] if d else []
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_page = {executor.submit(fetch_page, page): page for page in range(2, fetch_pages + 1)}
+            for future in concurrent.futures.as_completed(future_to_page):
+                try:
+                    movies.extend(future.result())
+                except Exception:
+                    pass
+                    
+    return movies
+
